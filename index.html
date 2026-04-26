@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Instruction Set Interpreter</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0d0f14;
+    --bg2:       #13161d;
+    --bg3:       #1a1e28;
+    --border:    rgba(255,255,255,0.07);
+    --border2:   rgba(255,255,255,0.13);
+    --accent:    #4ade80;
+    --accent2:   #22c55e;
+    --blue:      #60a5fa;
+    --yellow:    #fbbf24;
+    --red:       #f87171;
+    --text:      #e2e8f0;
+    --muted:     #64748b;
+    --mono:      'JetBrains Mono', monospace;
+    --sans:      'Space Grotesk', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  /* ── Header ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg2);
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 10px var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .logo h1 { font-size: 15px; font-weight: 500; letter-spacing: 0.05em; font-family: var(--mono); }
+  .logo span { color: var(--accent); }
+
+  .status-bar {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; font-family: var(--mono); color: var(--muted);
+  }
+  .status-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--muted);
+    transition: all 0.3s;
+  }
+  .status-dot.online { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .status-dot.error  { background: var(--red);    box-shadow: 0 0 6px var(--red); }
+
+  /* ── Layout ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    height: calc(100vh - 57px);
+  }
+
+  /* ── Sidebar ── */
+  nav {
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+  }
+  .nav-label {
+    font-size: 10px; font-family: var(--mono);
+    color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.15em; padding: 0 20px 10px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 20px; cursor: pointer;
+    color: var(--muted); font-size: 13px; font-weight: 400;
+    border-left: 2px solid transparent;
+    transition: all 0.2s;
+    user-select: none;
+  }
+  .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+  .nav-item.active {
+    color: var(--accent); border-left-color: var(--accent);
+    background: rgba(74,222,128,0.06);
+  }
+  .nav-icon {
+    width: 18px; height: 18px; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-family: var(--mono); font-weight: 600;
+    background: var(--bg3); border: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .nav-item.active .nav-icon {
+    background: rgba(74,222,128,0.15);
+    border-color: rgba(74,222,128,0.3);
+    color: var(--accent);
+  }
+  .nav-sep { height: 1px; background: var(--border); margin: 16px 20px; }
+
+  /* ── Main Panel ── */
+  main { display: flex; flex-direction: column; overflow: hidden; }
+
+  .panel { display: none; flex-direction: column; height: 100%; padding: 28px 32px; gap: 20px; overflow-y: auto; }
+  .panel.active { display: flex; }
+
+  .panel-title {
+    font-size: 13px; font-family: var(--mono);
+    color: var(--muted); margin-bottom: 4px;
+  }
+  .panel-title span { color: var(--accent); }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .card-label {
+    font-size: 11px; font-family: var(--mono);
+    color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.1em; margin-bottom: 12px;
+  }
+
+  /* ── Inputs ── */
+  input[type=text], textarea, select {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 7px;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-family: var(--mono);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input[type=text]:focus, textarea:focus, select:focus {
+    border-color: rgba(74,222,128,0.4);
+  }
+  textarea { min-height: 110px; resize: vertical; line-height: 1.7; }
+  select option { background: var(--bg3); }
+  .input-row { display: flex; gap: 10px; }
+  .input-row input, .input-row select { margin: 0; }
+
+  /* ── Buttons ── */
+  .btn {
+    padding: 9px 20px;
+    font-size: 13px; font-family: var(--mono); font-weight: 500;
+    border-radius: 7px; border: 1px solid var(--border2);
+    background: var(--bg3); color: var(--text);
+    cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .btn:hover { border-color: rgba(74,222,128,0.4); color: var(--accent); }
+  .btn:active { transform: scale(0.97); }
+  .btn.run {
+    background: rgba(74,222,128,0.12);
+    border-color: rgba(74,222,128,0.35);
+    color: var(--accent);
+  }
+  .btn.run:hover { background: rgba(74,222,128,0.2); }
+  .btn.save {
+    background: rgba(96,165,250,0.1);
+    border-color: rgba(96,165,250,0.3);
+    color: var(--blue);
+  }
+  .btn.save:hover { background: rgba(96,165,250,0.18); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .btn-row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+  .btn-row input { max-width: 180px; }
+
+  /* ── Terminal output ── */
+  .terminal {
+    background: #080a0e;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    min-height: 180px;
+    max-height: 340px;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.9;
+    flex: 1;
+  }
+  .terminal::-webkit-scrollbar { width: 4px; }
+  .terminal::-webkit-scrollbar-track { background: transparent; }
+  .terminal::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .t-prompt { color: var(--muted); }
+  .t-input  { color: var(--blue); }
+  .t-result { color: var(--accent); }
+  .t-error  { color: var(--red); }
+  .t-info   { color: var(--muted); }
+  .t-sep    { color: #1e2530; }
+  .t-label  { color: var(--yellow); }
+
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; height: 100%; color: var(--muted);
+    font-size: 12px; font-family: var(--mono); gap: 8px;
+  }
+  .empty-state .icon { font-size: 28px; opacity: 0.3; }
+
+  /* ── Spinner ── */
+  .spinner {
+    display: inline-block; width: 12px; height: 12px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── API config ── */
+  .api-config {
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 20px 20px;
+  }
+  .api-config input { font-size: 11px; }
+
+  /* ── Memory fields ── */
+  #memFields { margin-top: 12px; display: none; }
+  #memFields .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .field-label { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-bottom: 5px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    <h1>ISI <span>//</span> Instruction Set Interpreter</h1>
+  </div>
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">checking...</span>
+  </div>
+</header>
+
+<div class="layout">
+  <nav>
+    <div class="nav-label">Modules</div>
+    <div class="nav-item active" onclick="switchPanel(0)">
+      <div class="nav-icon">P1</div>
+      Read from File
+    </div>
+    <div class="nav-item" onclick="switchPanel(1)">
+      <div class="nav-icon">P2</div>
+      HEX / Binary
+    </div>
+    <div class="nav-item" onclick="switchPanel(2)">
+      <div class="nav-icon">P3</div>
+      Symbol String
+    </div>
+    <div class="nav-sep"></div>
+    <div class="nav-label">Server</div>
+    <div class="api-config">
+      <input type="text" id="apiBase" value="http://localhost:8080" placeholder="http://localhost:8080">
+    </div>
+  </nav>
+
+  <main>
+
+    <!-- PART 1 -->
+    <div class="panel active" id="panel0">
+      <div>
+        <div class="panel-title">Part <span>01</span> — Read Instructions from a File</div>
+      </div>
+      <div class="card">
+        <div class="card-label">File Contents</div>
+        <textarea id="fileContent" placeholder="Paste your file contents here — one instruction per line:&#10;&#10;7800&#10;F400&#10;1ABC&#10;0111100000000000"></textarea>
+        <div class="btn-row">
+          <button class="btn run" onclick="runPart1()">Run Interpreter</button>
+          <button class="btn" onclick="clearOut(0)">Clear</button>
+        </div>
+      </div>
+      <div class="card" style="flex:1;display:flex;flex-direction:column;">
+        <div class="card-label">Output</div>
+        <div class="terminal" id="out0"><div class="empty-state"><div class="icon">▷</div><div>Output will appear here</div></div></div>
+        <div class="btn-row" style="margin-top:12px;">
+          <input type="text" id="fname0" placeholder="output.txt">
+          <button class="btn save" onclick="saveOutput(0)">↓ Save File</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PART 2 -->
+    <div class="panel" id="panel1">
+      <div>
+        <div class="panel-title">Part <span>02</span> — Enter Instruction from Screen (HEX / Binary)</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Instruction Code</div>
+        <div class="input-row">
+          <input type="text" id="hexInput" placeholder="4-digit HEX (e.g. 7800) or 16-bit Binary (e.g. 0111100000000000)" maxlength="16"
+            onkeydown="if(event.key==='Enter') runPart2()">
+          <button class="btn run" onclick="runPart2()">Interpret</button>
+          <button class="btn" onclick="clearOut(1)">Clear</button>
+        </div>
+        <div style="margin-top:10px;font-size:11px;color:var(--muted);font-family:var(--mono);">
+          Examples: &nbsp;7800 &nbsp;·&nbsp; F400 &nbsp;·&nbsp; 1ABC &nbsp;·&nbsp; 0111100000000000
+        </div>
+      </div>
+      <div class="card" style="flex:1;display:flex;flex-direction:column;">
+        <div class="card-label">Output</div>
+        <div class="terminal" id="out1"><div class="empty-state"><div class="icon">▷</div><div>Output will appear here</div></div></div>
+        <div class="btn-row" style="margin-top:12px;">
+          <input type="text" id="fname1" placeholder="output.txt">
+          <button class="btn save" onclick="saveOutput(1)">↓ Save File</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PART 3 -->
+    <div class="panel" id="panel2">
+      <div>
+        <div class="panel-title">Part <span>03</span> — Enter Instruction as Symbol String</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Symbol</div>
+        <select id="symSelect" onchange="onSymChange()">
+          <option value="">— Select a symbol —</option>
+          <optgroup label="Register Instructions">
+            <option>CLA</option><option>CLE</option><option>CMA</option><option>CME</option>
+            <option>CIR</option><option>CIL</option><option>INC</option><option>SPA</option>
+            <option>SNA</option><option>SZA</option><option>SZE</option><option>HLT</option>
+          </optgroup>
+          <optgroup label="I/O Instructions">
+            <option>INP</option><option>OUT</option><option>SKI</option><option>SKO</option>
+            <option>ION</option><option>IOF</option>
+          </optgroup>
+          <optgroup label="Memory Instructions">
+            <option>AND</option><option>ADD</option><option>LDA</option><option>STA</option>
+            <option>BUN</option><option>BSA</option><option>ISZ</option>
+          </optgroup>
+        </select>
+
+        <div id="memFields">
+          <div class="field-grid">
+            <div>
+              <div class="field-label">Address (HEX, 3 digits)</div>
+              <input type="text" id="addrInput" placeholder="0A1" maxlength="3">
+            </div>
+            <div>
+              <div class="field-label">Addressing Mode</div>
+              <select id="modeSelect">
+                <option value="D">Direct</option>
+                <option value="I">Indirect</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn run" onclick="runPart3()">Interpret</button>
+          <button class="btn" onclick="clearOut(2)">Clear</button>
+        </div>
+      </div>
+      <div class="card" style="flex:1;display:flex;flex-direction:column;">
+        <div class="card-label">Output</div>
+        <div class="terminal" id="out2"><div class="empty-state"><div class="icon">▷</div><div>Output will appear here</div></div></div>
+        <div class="btn-row" style="margin-top:12px;">
+          <input type="text" id="fname2" placeholder="output.txt">
+          <button class="btn save" onclick="saveOutput(2)">↓ Save File</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const MEM_SYMS = new Set(['AND','ADD','LDA','STA','BUN','BSA','ISZ']);
+const outLogs  = [[],[],[]];
+
+// ── Auto-detect Codespaces API URL ──
+(function() {
+  const host = location.hostname;
+  // Codespaces hostnames look like: NAME-PORT.app.github.dev
+  const match = host.match(/^(.+)-\d+\.app\.github\.dev$/);
+  if (match) {
+    const base = match[1]; // e.g. reimagined-space-funicular-jj76v94px9x7hp75
+    const apiUrl = 'https://' + base + '-8080.app.github.dev';
+    document.getElementById('apiBase').value = apiUrl;
+  }
+})();
+
+// ── API base URL ──
+function api() { return document.getElementById('apiBase').value.trim().replace(/\/$/, ''); }
+
+// ── Status check ──
+async function checkStatus() {
+  const dot  = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+  try {
+    const r = await fetch(api() + '/api/part2', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({code:'7800'}),
+      signal: AbortSignal.timeout(2000)
+    });
+    if (r.ok) {
+      dot.className = 'status-dot online';
+      text.textContent = 'server online';
+    } else throw new Error();
+  } catch {
+    dot.className = 'status-dot error';
+    text.textContent = 'server offline';
+  }
+}
+checkStatus();
+setInterval(checkStatus, 5000);
+
+// ── Tab switching ──
+function switchPanel(n) {
+  document.querySelectorAll('.nav-item').forEach((el,i) => el.classList.toggle('active', i===n));
+  document.querySelectorAll('.panel').forEach((el,i)    => el.classList.toggle('active', i===n));
+}
+
+// ── Terminal logging ──
+function log(idx, text, cls) {
+  const el = document.getElementById('out'+idx);
+  const empty = el.querySelector('.empty-state');
+  if (empty) empty.remove();
+  const line = document.createElement('div');
+  line.className = cls || 't-info';
+  line.textContent = text;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+  if (text.trim()) outLogs[idx].push(text);
+}
+
+function clearOut(idx) {
+  document.getElementById('out'+idx).innerHTML = '<div class="empty-state"><div class="icon">▷</div><div>Output will appear here</div></div>';
+  outLogs[idx] = [];
+}
+
+function logSep(idx)   { log(idx, '─'.repeat(52), 't-sep'); }
+function logLoading(idx) {
+  const el = document.getElementById('out'+idx);
+  const empty = el.querySelector('.empty-state');
+  if (empty) empty.remove();
+  const sp = document.createElement('span');
+  sp.className = 'spinner'; sp.id = 'spinner'+idx;
+  el.appendChild(sp);
+}
+function removeSpinner(idx) {
+  const sp = document.getElementById('spinner'+idx);
+  if (sp) sp.remove();
+}
+
+// ── Part 1 ──
+async function runPart1() {
+  const content = document.getElementById('fileContent').value;
+  if (!content.trim()) { log(0,'No content entered.','t-error'); return; }
+  clearOut(0); logLoading(0);
+  try {
+    const res = await fetch(api() + '/api/part1', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({content})
+    });
+    removeSpinner(0);
+    const data = await res.json();
+    if (data.error) { log(0, 'Error: ' + data.error, 't-error'); return; }
+    log(0, data.count + ' instruction(s) loaded.', 't-info');
+    logSep(0);
+    data.results.forEach((item, i) => {
+      log(0, 'Instruction ' + (i+1) + ':  ' + item.input, 't-label');
+      const isErr = item.result.startsWith('ERROR') || item.result.startsWith('Invalid');
+      log(0, item.result, isErr ? 't-error' : 't-result');
+      log(0, '', 't-info');
+    });
+    logSep(0);
+    log(0, 'Done.', 't-info');
+  } catch(e) {
+    removeSpinner(0);
+    log(0, 'Connection error. Is the server running?', 't-error');
+  }
+}
+
+// ── Part 2 ──
+async function runPart2() {
+  const code = document.getElementById('hexInput').value.trim().toUpperCase();
+  if (!code) return;
+  logLoading(1);
+  try {
+    const res = await fetch(api() + '/api/part2', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({code})
+    });
+    removeSpinner(1);
+    const data = await res.json();
+    if (data.error) { log(1, 'Error: ' + data.error, 't-error'); return; }
+    log(1, '>> ' + data.input, 't-prompt');
+    const isErr = data.result.startsWith('ERROR') || data.result.startsWith('Invalid');
+    log(1, data.result, isErr ? 't-error' : 't-result');
+    log(1, '', 't-info');
+    document.getElementById('hexInput').value = '';
+  } catch(e) {
+    removeSpinner(1);
+    log(1, 'Connection error. Is the server running?', 't-error');
+  }
+}
+
+// ── Part 3 ──
+function onSymChange() {
+  const sym = document.getElementById('symSelect').value;
+  document.getElementById('memFields').style.display = MEM_SYMS.has(sym) ? 'block' : 'none';
+}
+
+async function runPart3() {
+  const symbol = document.getElementById('symSelect').value;
+  if (!symbol) { log(2, 'Please select a symbol.', 't-error'); return; }
+  const address = document.getElementById('addrInput').value.trim();
+  const mode    = document.getElementById('modeSelect').value;
+  if (MEM_SYMS.has(symbol) && !address) { log(2, 'Address is required for memory instructions.', 't-error'); return; }
+  logLoading(2);
+  try {
+    const res = await fetch(api() + '/api/part3', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({symbol, address, mode})
+    });
+    removeSpinner(2);
+    const data = await res.json();
+    if (data.error) { log(2, 'Error: ' + data.error, 't-error'); return; }
+    log(2, '>> ' + data.symbol + (data.hex ? '  →  0x' + data.hex : ''), 't-label');
+    log(2, data.result, 't-result');
+    log(2, '', 't-info');
+  } catch(e) {
+    removeSpinner(2);
+    log(2, 'Connection error. Is the server running?', 't-error');
+  }
+}
+
+// ── Save to file ──
+function saveOutput(idx) {
+  if (!outLogs[idx].length) { alert('No output to save yet.'); return; }
+  const fname = document.getElementById('fname'+idx).value.trim() || 'output.txt';
+  const lines = [
+    '================================================',
+    '   Instruction Set Interpreter - Output',
+    '================================================',
+    '',
+    ...outLogs[idx],
+    '',
+    '================================================'
+  ].join('\n');
+  const blob = new Blob([lines], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = fname;
+  a.click();
+}
+</script>
+</body>
+</html>
