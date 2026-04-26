@@ -386,18 +386,6 @@
 const MEM_SYMS = new Set(['AND','ADD','LDA','STA','BUN','BSA','ISZ']);
 const outLogs  = [[],[],[]];
 
-// ── Auto-detect Codespaces API URL ──
-(function() {
-  const host = location.hostname;
-  // Codespaces hostnames look like: NAME-PORT.app.github.dev
-  const match = host.match(/^(.+)-\d+\.app\.github\.dev$/);
-  if (match) {
-    const base = match[1]; // e.g. reimagined-space-funicular-jj76v94px9x7hp75
-    const apiUrl = 'https://' + base + '-8080.app.github.dev';
-    document.getElementById('apiBase').value = apiUrl;
-  }
-})();
-
 // ── API base URL ──
 function api() { return document.getElementById('apiBase').value.trim().replace(/\/$/, ''); }
 
